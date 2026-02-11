@@ -1,6 +1,9 @@
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_huggingface import HuggingFaceEndpoint, ChatHuggingFace
 
+import os
+
+HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
 
 endpoint=HuggingFaceEndpoint(
     repo_id="mistralai/Mistral-7B-Instruct-v0.2",

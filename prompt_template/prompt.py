@@ -2,7 +2,9 @@
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_huggingface import HuggingFaceEndpoint, ChatHuggingFace
 
+import os
 
+HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
 
 #  HF Endpoint (conversational model)
 endpoint = HuggingFaceEndpoint(
