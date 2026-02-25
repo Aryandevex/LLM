@@ -7,7 +7,6 @@ import os
 
 HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
 
-# HF Endpoint (conversational model)
 endpoint = HuggingFaceEndpoint(
     repo_id="mistralai/Mistral-7B-Instruct-v0.2",
     huggingfacehub_api_token=HUGGINGFACE_API_KEY,
@@ -17,7 +16,7 @@ endpoint = HuggingFaceEndpoint(
 
 chat_model = ChatHuggingFace(llm=endpoint)
 
-# 🔥 PRO SYSTEM PROMPT
+
 prompt = ChatPromptTemplate.from_messages([
     (
         "system",
@@ -65,7 +64,6 @@ Before responding:
 
 chain = prompt | chat_model
 
-# 🧨 Example Architecture Input
 architecture_input = """
 We have a Django app deployed on a single EC2 instance.
 Celery runs on the same machine.
