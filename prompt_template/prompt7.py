@@ -80,10 +80,9 @@ result = chain.invoke({
 print("Raw Model Output:\n")
 print(result.content)
 
-# 🔍 Optional JSON Validation
 try:
     parsed = json.loads(result.content)
     print("\nParsed JSON:\n")
     print(parsed)
 except Exception as e:
-    print("\n⚠ Invalid JSON returned:", e)
+    print("\n Invalid JSON returned:", e)

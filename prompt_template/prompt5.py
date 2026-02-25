@@ -7,7 +7,7 @@ import os
 HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
 
 
-# 1️⃣ HF Endpoint
+
 endpoint = HuggingFaceEndpoint(
     repo_id="mistralai/Mistral-7B-Instruct-v0.2",
     huggingfacehub_api_token=HUGGINGFACE_API_KEY,
@@ -15,10 +15,9 @@ endpoint = HuggingFaceEndpoint(
     max_new_tokens=120,
 )
 
-# 2️⃣ Chat model
+
 chat_model = ChatHuggingFace(llm=endpoint)
 
-# 3️⃣ Output-controlled prompt (ESCAPED JSON)
 prompt = ChatPromptTemplate.from_messages([
     (
         "system",
@@ -37,10 +36,9 @@ prompt = ChatPromptTemplate.from_messages([
     )
 ])
 
-# 4️⃣ LCEL chain
 chain = prompt | chat_model
 
-# 5️⃣ Invoke
+
 result = chain.invoke({
     "query": "I want to reset my account password."
 })

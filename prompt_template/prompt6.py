@@ -7,7 +7,7 @@ import os
 
 HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
 
-# HF Conversational Endpoint
+
 endpoint = HuggingFaceEndpoint(
     repo_id="mistralai/Mistral-7B-Instruct-v0.2",
     huggingfacehub_api_token=HUGGINGFACE_API_KEY,
@@ -15,7 +15,6 @@ endpoint = HuggingFaceEndpoint(
     max_new_tokens=200,
 )
 
-# Chat wrapper
 chat_model = ChatHuggingFace(llm=endpoint)
 
 prompt = ChatPromptTemplate.from_messages([
@@ -47,10 +46,9 @@ Do not output anything outside JSON.
     )
 ])
 
-# LCEL chain
+
 chain = prompt | chat_model
 
-# 🔥 Example Query
 result = chain.invoke({
     "query": "How does Redis help with Celery workers?"
 })
@@ -58,10 +56,9 @@ result = chain.invoke({
 print("Raw Model Output:")
 print(result.content)
 
-# Optional: Validate JSON safely
 try:
     parsed = json.loads(result.content)
     print("\nParsed JSON:")
     print(parsed)
 except Exception as e:
-    print("\n⚠ Invalid JSON returned:", e)
+    print("\n Invalid JSON returned:", e)
