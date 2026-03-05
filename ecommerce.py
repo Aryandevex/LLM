@@ -1,143 +1,109 @@
 import os
 import pandas as pd
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
-from langchain.schema import Document
-from langchain_core.tools import tool
-from langchain_core.prompts import ChatPromptTemplate
-
+# LangChain Imports
+from langchain_huggingface import HuggingFaceEndpoint, ChatHuggingFace, HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
-from langchain_huggingface import (
-    HuggingFaceEndpoint,
-    ChatHuggingFace,
-    HuggingFaceEmbeddings
-)
+from langchain_core.documents import Document
+from langchain.chains import RetrievalQA
+from langchain.prompts import PromptTemplate
 
-# =========================================================
-# 1. ENV + CONFIG
-# =========================================================
-load_dotenv()
+# 1. SETUP & CONFIGURATION
+load_dotenv(find_dotenv())
 HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
+
 if not HUGGINGFACE_API_KEY:
-    raise RuntimeError("Missing HUGGINGFACE_API_KEY")
+    raise ValueError("HUGGINGFACE_API_KEY not found in environment variables.")
 
-DATA_PATH = "ecommerce_fashion.csv"
-VECTOR_PATH = "faiss_index"
+DATASET_PATH = r"C:\Users\Lenovo\Downloads\archive (3)\FashionDataset.csv"
 
-# =========================================================
-# 2. LOAD DATA
-# =========================================================
-print("📦 Loading dataset...")
-df = pd.read_csv(DATA_PATH)
+def run_rag_bot():
+    print("--- Starting E-commerce RAG Bot Pipeline ---")
 
-# =========================================================
-# 3. TOOLS (Structured Operations)
-# =========================================================
-@tool
-def average_price_by_category(category: str) -> float:
-    """Returns average price of products in a given master category."""
-    filtered = df[df["masterCategory"].str.contains(category, case=False)]
-    return float(filtered["price"].mean())
+    # 2. LOAD & PREPROCESS DATA
+    print("\n[Step 1/5] Loading and cleaning dataset...")
+    df = pd.read_csv(DATASET_PATH)
+    
+    # We'll take a sample of 1000 products for a quick demonstration.
+    # You can increase this to include the full 50k+ dataset if your machine allows.
+    df_sample = df.sample(n=min(1000, len(df)), random_state=42).fillna("N/A")
 
-@tool
-def count_products_by_gender(gender: str) -> int:
-    """Returns total number of products for a gender."""
-    return int(df[df["gender"].str.lower() == gender.lower()].shape[0])
-
-TOOLS = [average_price_by_category, count_products_by_gender]
-
-# =========================================================
-# 4. BUILD / LOAD VECTOR STORE (FAISS)
-# =========================================================
-embeddings = HuggingFaceEmbeddings(
-    model_name="sentence-transformers/all-MiniLM-L6-v2"
-)
-
-if os.path.exists(VECTOR_PATH):
-    print("📂 Loading FAISS index...")
-    vectorstore = FAISS.load_local(
-        VECTOR_PATH,
-        embeddings,
-        allow_dangerous_deserialization=True
-    )
-else:
-    print("🧠 Creating FAISS index...")
+    # Convert each row into a single descriptive string (Document)
     documents = []
-    for _, row in df.iterrows():
-        text = f"""
-        Product: {row['productDisplayName']}
-        Category: {row['masterCategory']} > {row['subCategory']}
-        Color: {row['baseColour']}
-        Gender: {row['gender']}
-        Price: {row['price']}
-        """
-        documents.append(Document(page_content=text))
-
-    vectorstore = FAISS.from_documents(documents, embeddings)
-    vectorstore.save_local(VECTOR_PATH)
-    print("✅ FAISS index saved")
-
-retriever = vectorstore.as_retriever(search_kwargs={"k": 4})
-
-# =========================================================
-# 5. LLM SETUP
-# =========================================================
-llm_endpoint = HuggingFaceEndpoint(
-    repo_id="Qwen/Qwen2.5-7B-Instruct",
-    huggingfacehub_api_token=HUGGINGFACE_API_KEY,
-    temperature=0.2,
-    max_new_tokens=300
-)
-
-llm = ChatHuggingFace(llm=llm_endpoint)
-llm_with_tools = llm.bind_tools(TOOLS)
-
-# =========================================================
-# 6. RAG PROMPT
-# =========================================================
-PROMPT = ChatPromptTemplate.from_messages([
-    ("system",
-     "You are a smart e-commerce fashion assistant. "
-     "Use the provided product context to answer. "
-     "Use tools ONLY when calculations or statistics are needed."),
-    ("human",
-     "Question: {question}\n\nProduct Context:\n{context}")
-])
-
-# =========================================================
-# 7. CHAT LOOP (Production Logic)
-# =========================================================
-print("\n🛒 E-Commerce Fashion Bot Ready!")
-print("Type 'exit' to quit.\n")
-
-while True:
-    query = input("User: ")
-    if query.lower() in {"exit", "quit"}:
-        print("👋 Bye!")
-        break
-
-    # ---- RAG retrieval ----
-    docs = retriever.invoke(query)
-    context = "\n\n".join(doc.page_content for doc in docs)
-
-    # ---- LLM invoke ----
-    response = llm_with_tools.invoke(
-        PROMPT.format(
-            question=query,
-            context=context
+    for _, row in df_sample.iterrows():
+        content = (
+            f"Brand: {row['BrandName']}. "
+            f"Category: {row['Category']}. "
+            f"Product: {row['Deatils']}. "
+            f"Available Sizes: {row['Sizes']}. "
+            f"MRP: {row['MRP']}. "
+            f"Selling Price: {row['SellPrice']}. "
+            f"Discount: {row['Discount']}."
         )
+        # We store metadata so we can display it if needed
+        doc = Document(page_content=content, metadata={"brand": row['BrandName'], "category": row['Category']})
+        documents.append(doc)
+
+    # 3. EMBEDDINGS & VECTOR DATABASE
+    print("\n[Step 2/5] Creating local Vector Database (Indexing)...")
+    # Using a small, fast local embedding model
+    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+    
+    # Build FAISS index (this stays on your local machine)
+    vector_db = FAISS.from_documents(documents, embeddings)
+    print("Vector Database initialized successfully.")
+
+    # 4. LLM SETUP
+    print("\n[Step 3/5] Initializing Zephyr Generator (Hugging Face API)...")
+    endpoint = HuggingFaceEndpoint(
+        repo_id="Qwen/Qwen2.5-7B-Instruct",
+        huggingfacehub_api_token=HUGGINGFACE_API_KEY,
+        temperature=0.2,
+        max_new_tokens=512,
+    )
+    llm = ChatHuggingFace(llm=endpoint)
+
+    # 5. RAG CHAIN SETUP
+    print("\n[Step 4/5] Setting up Retrieval-QA Chain...")
+    
+    # Custom prompt to ensure the bot answers nicely
+    template = """You are a helpful e-commerce shopping assistant. 
+    Use the following pieces of product context to answer the user's question. 
+    If you don't know the answer, just say that you don't know, don't try to make up an answer.
+    
+    Context: {context}
+    
+    Question: {question}
+    
+    Assistant's Response:"""
+    
+    rag_prompt = PromptTemplate(template=template, input_variables=["context", "question"])
+
+    # Create the RAG chain
+    qa_chain = RetrievalQA.from_chain_type(
+        llm=llm,
+        chain_type="stuff",
+        retriever=vector_db.as_retriever(search_kwargs={"k": 3}),
+        chain_type_kwargs={"prompt": rag_prompt}
     )
 
-    # ---- Tool execution ----
-    if response.tool_calls:
-        for call in response.tool_calls:
-            name = call["name"]
-            args = call["args"]
+    # 6. INTERACTIVE CHAT
+    print("\n[Step 5/5] RAG Pipeline Ready!")
+    print("\nAsk me anything about the products (e.g., 'What indigo dresses do you have?')")
+    print("Type 'exit' to quit.\n")
 
-            print(f"\n🔧 Tool called: {name}")
-            if name == "average_price_by_category":
-                print("📊 Result:", average_price_by_category.invoke(args))
-            elif name == "count_products_by_gender":
-                print("👕 Result:", count_products_by_gender.invoke(args))
-    else:
-        print("\n🤖 Bot:", response.content)
+    while True:
+        query = input("You: ")
+        if query.lower() in ['exit', 'quit']:
+            break
+        
+        print("Searching and generating answer...")
+        try:
+            result = qa_chain.invoke(query)
+            print(f"\nBot: {result['result']}\n")
+        except Exception as e:
+            print(f"\nError: {e}\n")
+
+if __name__ == "__main__":
+    run_rag_bot()
