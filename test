@@ -1,0 +1,58 @@
+from django.urls import reverse_lazy
+from django.views.generic import ListView, CreateView, UpdateView, DeleteView
+from .models import Project, Member
+from .forms import ProjectForm, MemberForm
+from .mixins import AdminRequiredMixin
+
+# -------- Project Views -------- #
+
+class ProjectListView(AdminRequiredMixin, ListView):
+    model = Project
+    template_name = 'project_list.html'
+
+
+class ProjectCreateView(AdminRequiredMixin, CreateView):
+    model = Project
+    form_class = ProjectForm
+    template_name = 'project_form.html'
+    success_url = reverse_lazy('project_list')
+
+
+class ProjectUpdateView(AdminRequiredMixin, UpdateView):
+    model = Project
+    form_class = ProjectForm
+    template_name = 'project_form.html'
+    success_url = reverse_lazy('project_list')
+
+
+class ProjectDeleteView(AdminRequiredMixin, DeleteView):
+    model = Project
+    template_name = 'project_confirm_delete.html'
+    success_url = reverse_lazy('project_list')
+
+
+# -------- Member Views -------- #
+
+class MemberListView(AdminRequiredMixin, ListView):
+    model = Member
+    template_name = 'member_list.html'
+
+
+class MemberCreateView(AdminRequiredMixin, CreateView):
+    model = Member
+    form_class = MemberForm
+    template_name = 'member_form.html'
+    success_url = reverse_lazy('member_list')
+
+
+class MemberUpdateView(AdminRequiredMixin, UpdateView):
+    model = Member
+    form_class = MemberForm
+    template_name = 'member_form.html'
+    success_url = reverse_lazy('member_list')
+
+
+class MemberDeleteView(AdminRequiredMixin, DeleteView):
+    model = Member
+    template_name = 'member_confirm_delete.html'
+    success_url = reverse_lazy('member_list')
