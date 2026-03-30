@@ -1,39 +1,75 @@
-"""
-A real agent is defined by 5 characteristics:
+# Simulate an Agentic AI workflow
 
-Goal-Driven – It has a purpose it is trying to achieve.
-Planning / Reasoning – It thinks about steps to reach the goal.
-Action / Execution – It performs tasks or interacts with the environment.
-Observation / Feedback – It checks results and knows success or failure.
-Adaptation / Memory – It changes behavior if the first attempt fails and remembers past experience.
-"""
+# Example goal
 goal = "Fix login issue in my app"
 
-# 1. Planner thinks
-plan = generate_plan(goal)
+# -----------------------------
+# 1️⃣ Planner Agent
+# -----------------------------
+# Generate structured plan (normally from LLM)
+plan = {
+    "steps": [
+        "Identify the error message during login",
+        "Check authentication logs",
+        "Verify backend login logic",
+        "Inspect database",
+        "Test login functionality"
+    ]
+}
+
 print("\n[Planner Agent] Generated Plan:")
 for i, step in enumerate(plan["steps"], 1):
     print(f"{i}. {step}")
 
-# 2. Simulate Execution and Observation
+# -----------------------------
+# 2️⃣ Execution + Evaluation
+# -----------------------------
 execution_results = []
+
 for i, step in enumerate(plan["steps"], 1):
     print(f"\n[Execution Agent] Performing Step {i}: {step}")
-    # Here you simulate success/failure
+
+    # Simulate an issue if step mentions "database"
     if "database" in step.lower():
         result = "failed"
         print(f"[Evaluator Agent] Step {i} Result: {result} (issue found)")
-        # 3. Adaptive replanning
+
+        # -----------------------------
+        # 3️⃣ Replanner Agent
+        # -----------------------------
         print("[Replanner Agent] Adjusting plan...")
-        plan["steps"].insert(i, "Check DB connection and migrations")
-        print("[Replanner Agent] New Step Added")
+        new_step = "Check database connection and migrations"
+        plan["steps"].insert(i, new_step)  # Insert new corrective step
+        print(f"[Replanner Agent] New Step Added: {new_step}")
+
+        # Assume the replanned step succeeds
         result = "success"
+        print(f"[Evaluator Agent] Step {i} Result after replanning: {result}")
     else:
         result = "success"
         print(f"[Evaluator Agent] Step {i} Result: {result}")
 
+    # Store results
     execution_results.append({"step": step, "result": result})
 
-# 4. Memory Agent stores plan
-memory_store = {"goal": goal, "plan": plan, "results": execution_results}
+# -----------------------------
+# 4️⃣ Memory Agent
+# -----------------------------
+memory_store = {
+    "goal": goal,
+    "plan": plan,
+    "results": execution_results
+}
+
 print("\n[Memory Agent] Stored plan and results for future reference")
+
+# -----------------------------
+# 5️⃣ Show Final Plan and Results
+# -----------------------------
+print("\nFinal Plan After Execution and Replanning:")
+for i, step in enumerate(plan["steps"], 1):
+    print(f"{i}. {step}")
+
+print("\nExecution Results:")
+for r in execution_results:
+    print(f"- {r['step']} → {r['result']}")
