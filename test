@@ -56,3 +56,6 @@ class MemberDeleteView(AdminRequiredMixin, DeleteView):
     model = Member
     template_name = 'member_confirm_delete.html'
     success_url = reverse_lazy('member_list')
+
+
+https://docs.google.com/document/d/1667W6kOcjvbOGp0kVjLLoq9KIsrYSAX7K-XCxYLxst8/edit?tab=t.0
