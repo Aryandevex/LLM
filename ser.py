@@ -1,4 +1,4 @@
-# react_agent_serpapi.py
+# pip install langchain langchain-huggingface python-dotenv google-search-results
 
 import os
 from dotenv import load_dotenv, find_dotenv
