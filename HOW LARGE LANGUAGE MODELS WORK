@@ -1,0 +1,625 @@
+
+# HOW LARGE LANGUAGE MODELS WORK
+
+## LEARNING OBJECTIVES
+
+By the end of this class, you will be able to:
+1. List the 7 steps of the Transformer pipeline
+2. Define token, embedding, attention, context window, and temperature in plain English
+3. Explain why an LLM is called a "next-token prediction engine"
+4. Predict how changing temperature affects output
+
+---
+
+## PART 1: THE COMPLETE TRANSFORMER PIPELINE
+
+Here is the entire flow from your input to the model's output:
+
+```
+INPUT TEXT: "The cat sat on the"
+         ↓
+    ┌─────────────┐
+    │ TOKENIZER   │
+    └─────────────┘
+         ↓
+TOKENS: ["The", " cat", " sat", " on", " the"]
+         ↓
+    ┌─────────────┐
+    │ EMBEDDINGS  │
+    └─────────────┘
+         ↓
+VECTORS: [0.23, -0.45, 0.67, 0.12, -0.89]  (numbers for each token)
+         ↓
+    ┌─────────────┐
+    │ATTENTION    │
+    └─────────────┘
+         ↓
+WEIGHTED RELATIONSHIPS: "cat" ←→ "sat" (strong), "the" → "cat" (medium)
+         ↓
+    ┌─────────────┐
+    │FEED FORWARD │
+    │ NETWORK     │
+    └─────────────┘
+         ↓
+PROCESSED INFORMATION: patterns applied (grammar, facts, logic)
+         ↓
+    ┌─────────────┐
+    │NEXT TOKEN   │
+    │PREDICTION   │
+    └─────────────┘
+         ↓
+PROBABILITIES: "mat" (45%), "floor" (30%), "chair" (15%), others (10%)
+         ↓
+    ┌─────────────┐
+    │  OUTPUT     │
+    └─────────────┘
+         ↓
+GENERATED TEXT: "The cat sat on the mat"
+```
+
+**Key insight:** After outputting one token, the model adds it to the input and repeats the entire pipeline until it decides to stop.
+
+---
+
+## PART 2: DETAILED THEORY OF EACH CONCEPT
+
+### 1. TOKENIZER
+
+**What it does:** Splits raw text into smaller pieces called tokens.
+
+**Why it matters:** LLMs don't read letters or words directly. They read token IDs (numbers). Tokenization is the bridge between human text and machine numbers.
+
+**How tokenization works (conceptually):**
+- Common words become one token: "the", "cat", "run"
+- Uncommon words split into pieces: "unhappiness" → ["un", "happiness"]
+- Punctuation gets its own tokens: ".", ",", "?"
+- Spaces are often attached to the following word: " cat" (space + cat)
+
+**Real examples:**
+| Input Text | Tokens |
+|------------|--------|
+| "Hello world" | ["Hello", " world"] |
+| "I'm happy" | ["I", "'m", " happy"] |
+| "ChatGPT is amazing!" | ["Chat", "G", "PT", " is", " amazing", "!"] |
+| "🦙" | ["🦙"] (emoji = one token) |
+
+**Vocabulary size:** Most LLMs have a vocabulary of ~50,000 to ~100,000 possible tokens. GPT-4 uses approximately 100,000 tokens.
+
+**Why not just use words?** Because languages have millions of possible words, including rare ones, misspellings, and invented terms. Tokenization balances between:
+- Too fine (letters) → long sequences, slow processing
+- Too coarse (whole words) → huge vocabulary, poor handling of new words
+
+---
+
+### 2. EMBEDDINGS
+
+**What they are:** Numerical representations (vectors) of tokens that capture meaning and relationships.
+
+**Why they matter:** Computers understand numbers, not meaning. Embeddings convert semantic meaning into math so the model can process it.
+
+**The core idea:** Every token gets mapped to a list of numbers (typically 768 to 4096 numbers long). Tokens with similar meanings have similar numbers.
+
+**Analogy - A map of meanings:**
+Imagine a 2D map (real embeddings have hundreds of dimensions, but same idea):
+- "king" at coordinates (5, 10)
+- "queen" at (5, 9) → very close to "king"
+- "apple" at (-20, 30) → far from both
+- "orange" at (-19, 31) → close to "apple"
+
+**What embeddings capture:**
+- Synonyms are close: "happy" ≈ "joyful" ≈ "pleased"
+- Opposites are far: "hot" vs "cold"
+- Relationships can be calculated: "king" - "man" + "woman" ≈ "queen"
+- Grammatical roles: "run" vs "ran" (different but related)
+
+**Example (simplified numbers):**
+| Token | Embedding (simplified 3D) |
+|-------|---------------------------|
+| "cat" | [0.8, -0.2, 0.5] |
+| "kitten" | [0.7, -0.1, 0.6] |
+| "dog" | [0.8, -0.3, -0.4] |
+| "car" | [-0.9, 0.7, 0.1] |
+
+Notice "cat" and "kitten" are close. "Cat" and "dog" share some similarity (both pets) but differ in the third number. "Car" is completely different.
+
+**How embeddings are created:** The model learns them during training. Initially random, then adjusted billions of times based on context patterns.
+
+---
+
+### 3. SELF-ATTENTION
+
+**What it is:** A mechanism that determines how much each token should "pay attention" to every other token in the sequence.
+
+**Why it matters:** Words don't have fixed meanings. Their meaning depends on surrounding words. Attention resolves ambiguity.
+
+**The core problem attention solves:**
+Look at this sentence: *"She gave Maria the book because she was tired."*
+
+Who is "she" at the end? Is it the same person as the first "she" or Maria? Attention figures this out by looking back.
+
+**How attention works (conceptually):**
+1. Every token looks at every previous token
+2. The model calculates an "attention score" for each pair
+3. Higher score = more influence on the token's meaning
+4. The model creates weighted combinations of information
+
+**Examples of attention in action:**
+
+**Example 1 - Pronoun resolution:**
+Input: *"The dog chased the cat because it was scared."*
+- "it" pays high attention to "dog" (if dog was scared)
+- "it" pays high attention to "cat" (if cat was scared)
+- The rest of the sentence ("chased", "scared") determines which one
+
+**Example 2 - Adjective attachment:**
+Input: *"I saw a man with a telescope."*
+- "telescope" pays attention to "man" (he owns it)
+- "telescope" also pays attention to "saw" (maybe it was used for seeing)
+- Ambiguity remains without more context
+
+**Example 3 - Long-range dependencies:**
+Input: *"The small brown fox that lived in the forest near the river jumped over the log."*
+- "jumped" must agree with "fox" (singular), not "river" or "forest"
+- Attention allows "jumped" to look far back to "fox"
+
+**Visual representation:**
+```
+         The   cat   sat   on    the   mat
+The       1    0.2   0.1   0.3   0.8   0.1
+cat      0.3    1    0.9   0.2   0.3   0.7
+sat      0.1   0.8    1    0.1   0.2   0.6
+on       0.2   0.2   0.1    1    0.7   0.2
+the      0.7   0.3   0.2   0.6    1    0.3
+mat      0.1   0.6   0.5   0.2   0.3    1
+```
+(High numbers = strong attention. "sat" pays high attention to "cat" because cat is doing the sitting.)
+
+**Types of attention patterns:**
+- **Local attention:** Paying attention to nearby words (grammar, syntax)
+- **Global attention:** Paying attention to distant words (coreference, long-range dependencies)
+- **Self-attention:** Each token attending to itself (identity preservation)
+
+---
+
+### 4. FEED FORWARD NETWORK (FFN)
+
+**What it is:** A simple neural network layer that processes each token's attended information independently.
+
+**Why it matters:** Attention mixes information between tokens. The FFN applies pattern recognition and transformations to each token individually.
+
+**Analogy:**
+- **Attention** = Group discussion (everyone shares information)
+- **FFN** = Individual thinking time (each person processes what they heard)
+
+**What the FFN does:**
+1. Takes the output from attention (one vector per token)
+2. Applies learned patterns (grammar, facts, logic, reasoning)
+3. Produces a transformed vector for each token
+4. These transformations are the same for every position (shared weights)
+
+**Examples of patterns the FFN learns:**
+
+| Pattern Type | Example | What FFN learns |
+|--------------|---------|------------------|
+| Subject-verb agreement | "The cat runs" vs "The cats run" | Match singular/plural |
+| Tense consistency | "Yesterday I walked home" | Past tense after time words |
+| Factual knowledge | "Paris is the capital of" → "France" | Stored facts |
+| Commonsense reasoning | "If you drop a glass, it might" → "break" | Physical causality |
+| Grammar rules | "She goes to school" not "She go to school" | English syntax |
+
+**Important distinction:**
+- The FFN is the same for all token positions (same "brain" processes each word)
+- But each token's input is different (because attention gave them different contexts)
+- So each token gets a different output
+
+**How FFN relates to model size:**
+- Small models: FFN might be 1-2 layers
+- Large models (GPT-4): Dozens of alternating Attention + FFN layers (called "Transformer blocks")
+- Each layer refines the representations further
+
+---
+
+### 5. NEXT TOKEN PREDICTION
+
+**What it is:** The final step where the model calculates probabilities for every possible next token and selects one.
+
+**Why it matters:** This is the core objective. LLMs are fundamentally trained to do one thing: predict the next token. Everything else (translation, reasoning, coding) emerges from this.
+
+**How prediction works:**
+1. Take the final output vector from the last FFN layer
+2. Multiply it by a large matrix (vocabulary size × embedding size)
+3. Apply softmax (converts numbers to probabilities that sum to 100%)
+4. The result: a probability for each of ~100,000 possible tokens
+
+**Example probability distribution:**
+Input: "The cat sat on the"
+
+| Token | Probability |
+|-------|-------------|
+| " mat" | 45% |
+| " floor" | 30% |
+| " chair" | 15% |
+| " bed" | 5% |
+| " ground" | 3% |
+| " table" | 1.5% |
+| ... other 99,994 tokens | 0.5% total |
+
+**The iterative process (crucial insight):**
+The model does NOT write the whole answer at once. Instead:
+
+```
+Step 1: Input "The cat sat on the" → Predict "mat"
+Step 2: Input "The cat sat on the mat" → Predict "and"
+Step 3: Input "The cat sat on the mat and" → Predict "fell"
+Step 4: Input "... and fell" → Predict "asleep"
+Step 5: Input "... fell asleep" → Predict "."
+Step 6: Input "..." → Predict [STOP token]
+```
+
+**Why this matters for understanding LLMs:**
+- They can't plan ahead more than one token
+- They can't revise earlier choices (though some advanced methods add backtracking)
+- Each token is influenced by all previous tokens (including their own previous outputs)
+- This is why LLMs can "go off the rails" - one bad token leads to more bad tokens
+
+**How the model decides when to stop:**
+- Special [STOP] token in the vocabulary
+- When [STOP] has the highest probability, generation ends
+- Or when max length (context window) is reached
+
+---
+
+### 6. CONTEXT WINDOW
+
+**What it is:** The maximum number of tokens the model can "see" at once (its short-term memory).
+
+**Why it matters:** Any text outside the window is completely forgotten. The model cannot refer to it, no matter how important.
+
+**How it works:**
+- The model processes tokens in positions 1 through N (where N = context window size)
+- Position N+1 is invisible
+- When generating token N+1, the model drops token 1 (oldest)
+
+**Context window sizes of popular models:**
+
+| Model | Context Window (tokens) | Approximate words |
+|-------|------------------------|-------------------|
+| GPT-3.5 | 4,096 | ~3,000 |
+| GPT-4 (original) | 8,192 | ~6,000 |
+| GPT-4 Turbo | 128,000 | ~96,000 (300 pages) |
+| Claude 3 | 200,000 | ~150,000 |
+| Gemini 1.5 Pro | 1,000,000 | ~750,000 (novel trilogy) |
+| Llama 2 | 4,096 | ~3,000 |
+| Llama 3 | 8,192 - 128,000 | varies |
+
+**Practical implications:**
+
+**Scenario 1 - Chat conversation:**
+You: "My name is Alex."
+Bot: "Nice to meet you, Alex!"
+[200 messages later]
+You: "What's my name?"
+- If context window holds all 200 messages → "Alex"
+- If context window is too small → "I don't know"
+
+**Scenario 2 - Long document analysis:**
+Upload a 50,000 word book.
+- Model with 128K window → can read entire book
+- Model with 4K window → can only read ~15 pages
+
+**Scenario 3 - Code generation:**
+You paste 3,000 lines of code and ask for a bug fix.
+- Large window → model sees all code
+- Small window → model sees only the last part, misses context
+
+**How models handle exceeding the window:**
+- **Truncation:** Cut off the oldest tokens (lose beginning)
+- **Error:** Refuse to process (some APIs return error)
+- **Sliding window:** Keep only recent tokens (common in chat)
+
+**Why windows are expanding:**
+- Better attention algorithms (linear or near-linear scaling)
+- More memory and compute
+- User demand for longer documents and conversations
+
+---
+
+### 7. TEMPERATURE
+
+**What it is:** A setting that controls randomness in token selection after probabilities are calculated.
+
+**Why it matters:** Temperature is the primary way to control creativity vs. determinism without retraining the model.
+
+**How temperature works (conceptual):**
+1. Model calculates raw probabilities for each token
+2. Divide all probability scores by temperature value
+3. Re-normalize so probabilities sum to 100%
+4. Sample from the adjusted distribution
+
+**Temperature scale and effects:**
+
+| Temperature | Behavior | Mathematical effect |
+|-------------|----------|---------------------|
+| 0.0 (min) | Always pick highest probability token | Deterministic, greedy |
+| 0.1 - 0.3 | Very predictable, repetitive | High-probability tokens become much more likely |
+| 0.4 - 0.6 | Moderately creative, coherent | Slight flattening of distribution |
+| 0.7 - 1.0 | Balanced, natural | Original distribution preserved |
+| 1.1 - 1.5 | Creative, sometimes surprising | Distribution flattened, lower-probability tokens viable |
+| > 1.5 | Very random, often nonsensical | Nearly uniform distribution (all tokens equally likely) |
+
+**Example with actual probabilities:**
+
+Original probabilities for "The cat sat on the":
+- " mat": 45%
+- " floor": 30%
+- " chair": 15%
+- " bed": 5%
+- " ground": 3%
+- others: 2%
+
+**Temperature 0.1 (very low):**
+Almost always picks " mat" (over 99% chance)
+Output is deterministic
+
+**Temperature 0.8 (balanced):**
+- " mat": 40%
+- " floor": 28%
+- " chair": 18%
+- " bed": 8%
+- " ground": 4%
+- others: 2%
+Still favors "mat" but "floor" appears sometimes
+
+**Temperature 1.2 (creative):**
+- " mat": 30%
+- " floor": 25%
+- " chair": 20%
+- " bed": 12%
+- " ground": 8%
+- others: 5%
+"Chair" and "bed" become plausible
+
+**Temperature 2.0 (very random):**
+- " mat": 12%
+- " floor": 11%
+- " chair": 10%
+- " bed": 9%
+- " ground": 8%
+- others: 50% total
+Almost any token could appear, including nonsense
+
+**Practical temperature guidelines:**
+
+| Use Case | Recommended Temperature |
+|----------|------------------------|
+| Coding, math, facts | 0.0 - 0.2 |
+| Translation, summarization | 0.2 - 0.4 |
+| Customer service chat | 0.5 - 0.7 |
+| Creative writing, stories | 0.7 - 1.0 |
+| Brainstorming ideas | 0.8 - 1.2 |
+| Poetry, jokes | 0.9 - 1.3 |
+| Random generation | 1.5+ |
+
+**Common misconception:**
+Temperature does NOT change the model's knowledge or capabilities. It only changes token selection strategy. A low-temperature model doesn't "know more" - it just repeats its most confident predictions.
+
+**Top-p (nucleus sampling) - related concept:**
+Sometimes used with or instead of temperature:
+- Instead of considering all tokens, consider only the top P% of probability mass
+- Example: top_p = 0.9 means consider only tokens that together make up 90% of probability
+- Then sample from that subset
+- Often more intuitive than temperature for controlling diversity
+
+---
+
+## PART 3: PRACTICAL DEMOS TO RUN
+
+### Demo 1: Tokenization (Live)
+
+**What to show:** How the same text tokenizes differently.
+
+**Run this (using OpenAI tokenizer or similar):**
+
+Text 1: "Hello world"
+→ Shows: ["Hello", " world"] (2 tokens)
+
+Text 2: "Unhappiness"
+→ Shows: ["Un", "happiness"] (2 tokens) or ["un", "happy", "ness"] (3 tokens depending on model)
+
+Text 3: "I'm learning about LLMs!"
+→ Shows: ["I", "'m", " learning", " about", " LL", "Ms", "!"] (7 tokens)
+
+**Interactive demo idea:** Ask students to predict token count for:
+- "The quick brown fox" (likely 4-5 tokens)
+- "antidisestablishment" (likely 4-5 tokens, split into parts)
+- "123-456-7890" (likely 3-5 tokens)
+
+---
+
+### Demo 2: Attention Visualization (Live)
+
+**What to show:** Which words an LLM pays attention to.
+
+**Run this (conceptual - can use existing attention visualization tools):**
+
+Sentence: "The animal didn't cross the street because it was too tired."
+
+Ask the model to predict next token after "tired". Then show attention weights:
+- "it" pays strong attention to "animal"
+- "tired" pays attention to "didn't cross" (cause and effect)
+- "too" modifies "tired"
+
+**Simple classroom demo:**
+Write on board: "She poured water from the pitcher until it was empty."
+Ask: "What does 'it' refer to?" (pitcher)
+Ask: "How do you know?" (The word "empty" - pitchers get empty, water doesn't)
+This is what attention learns to do.
+
+---
+
+### Demo 3: Temperature Demonstration (Live)
+
+**What to show:** Same prompt, different temperature settings.
+
+**Prompt:** *"Write a one-sentence explanation of why the sky is blue."*
+
+**Temperature 0.0 (copy-paste or simulate):**
+> "The sky is blue because molecules in the air scatter blue light from the sun more than they scatter red light."
+
+**Temperature 0.5:**
+> "The sky appears blue due to Rayleigh scattering, where shorter blue light waves are scattered more by atmospheric particles."
+
+**Temperature 1.0:**
+> "It's blue because sunlight hits the atmosphere and blue light gets bounced around everywhere while red light keeps going straight."
+
+**Temperature 1.5:**
+> "Blue sky happens when sun kisses air and blue chooses to dance while red watches from the side."
+
+**Temperature 2.0 (simulated):**
+> "Sky blue because molecules like blue color best and push other colors away possibly."
+
+**Live demo suggestion:** If using an LLM playground, run the same prompt 5 times at temp 0.0 (identical each time) then at temp 1.0 (different each time).
+
+---
+
+### Demo 4: Context Window Effect (Live)
+
+**What to show:** Model forgetting old information.
+
+**Setup a chat conversation:**
+
+User: "My favorite color is green. I love green things."
+Assistant: "That's nice! Green is a great color."
+
+[Now insert 4,000 tokens of filler text - or simulate with a shorter example]
+
+Short version demo (using smaller context):
+```
+User: "My favorite animal is the elephant."
+Assistant: "Elephants are fascinating creatures."
+User: [Repeat "What is my favorite animal?" 10 times]
+Assistant: [Answers correctly at first, then after many exchanges forgets]
+```
+
+**Practical demonstration with limited context:**
+1. Give the model a specific fact: "Remember: access code is 8472"
+2. Have a long conversation (or paste a long document)
+3. Ask for the code later
+4. If context window exceeded, model will say it doesn't know
+
+**Simulated example:**
+```
+User: "The secret password is ORANGE."
+Assistant: "I've noted that."
+User: [Pastes 5 pages of text]
+User: "What's the password?"
+Assistant (small context window): "I don't see any password in our conversation."
+Assistant (large context window): "The password is ORANGE."
+```
+
+---
+
+### Demo 5: Next Token Prediction (Live)
+
+**What to show:** Model's probability distribution.
+
+**If you have API access:** Show logprobs for next token.
+
+Prompt: "The capital of France is"
+
+Show top 5 predictions:
+1. " Paris" (95%)
+2. " France" (2%)
+3. " a" (0.5%)
+4. " Lyon" (0.3%)
+5. " Marseille" (0.1%)
+
+**Classroom activity - Human LLM:**
+Give students this incomplete sentence: "After waking up, the first thing I do is"
+
+Each student writes their next 1-3 words. Collect answers. Show distribution:
+- "brush my teeth" (35%)
+- "drink coffee" (25%)
+- "check my phone" (20%)
+- "eat breakfast" (15%)
+- other (5%)
+
+Explain: This is exactly what an LLM does, but with billions of examples instead of 30 students.
+
+---
+
+### Demo 6: Iterative Generation (Live)
+
+**What to show:** LLM builds text one token at a time.
+
+**Step-by-step showing:**
+
+Start: "The"
+→ Predict "cat"
+Now: "The cat"
+→ Predict "sat"
+Now: "The cat sat"
+→ Predict "on"
+Now: "The cat sat on"
+→ Predict "the"
+Now: "The cat sat on the"
+→ Predict "mat"
+Now: "The cat sat on the mat"
+→ Predict "."
+Now: "The cat sat on the mat."
+→ Predict [STOP]
+
+**Visual demo:** Use a text generator that shows each token appearing one by one, not the whole response at once.
+
+---
+
+## PART 4: PUTTING IT ALL TOGETHER
+
+### How the Concepts Work Together
+
+```
+You type: "What is 2+2?"
+
+1. TOKENIZER → ["What", " is", " 2", "+", "2", "?"]
+
+2. EMBEDDINGS → Each token becomes a vector [0.1, -0.3, ...]
+
+3. ATTENTION → "+" pays attention to both "2"s. "?" pays attention to the whole question.
+
+4. FEED FORWARD → Recognizes pattern: "number + number" → "result"
+
+5. PREDICTION → Next token probabilities: " 4" (95%), " four" (3%), " equal" (1%), " about" (0.5%)
+
+6. TEMPERATURE (0.0) → Always picks " 4"
+
+7. OUTPUT → " 4"
+
+8. REPEAT → Input now "What is 2+2? 4" → Predict STOP
+```
+
+---
+
+### Common Misconceptions (Corrected)
+
+| Misconception | Reality |
+|---------------|---------|
+| LLMs read the whole prompt once, then write the answer | They read one token at a time, predicting next token repeatedly |
+| LLMs have persistent memory across conversations | They only remember what's in the current context window |
+| Higher temperature makes the model smarter | It makes it more random, not more capable |
+| Embeddings are just word IDs | They are rich numerical vectors capturing meaning and relationships |
+| Attention means the model "pays attention" like humans | It's a mathematical weighting, not conscious focus |
+
+---
+
+### Summary Table
+
+| Concept | Core Definition | Analogy |
+|---------|----------------|---------|
+| Tokenizer | Splits text into pieces | Cutting a sentence into puzzle pieces |
+| Embedding | Numbers representing meaning | Coordinates on a meaning map |
+| Attention | Weighting relationships between tokens | Highlighting important words in a sentence |
+| Feed Forward | Processing each token individually | Thinking about each word after hearing the discussion |
+| Next Token Prediction | Calculating probabilities for the next piece | Guessing the next word in a sentence |
+| Context Window | Maximum tokens the model can see | Short-term memory size |
+| Temperature | Randomness dial for token selection | Adventure vs. safety slider |
+
